@@ -24,7 +24,7 @@ getword = $FFDB ; jsr input 4 Hex digits in ASCII, out: monword=word
 putword = $FFE6 ; jsr output 4 Hex digits as ASCII, in: monword=word
 putcrlf = $FFF0 ; jsr output Carrige Return, Line Feed
 ```
-The second program is int.asm. This is a 16Bit integer package with some basic ASCIIZ string subroutines. For subroutine arguments (parameters) I use register A=low byte, X=high byte. Or you can place the parameters into "well known" zero page variables and call the subroutines. The 16Bit integer package is fast. I use the fastest multiplication and division subroutines from the net and I use my own fast decimal to integer conversation subroutine. The same dec2int idea I used in the 1980s for my Z80 32Bit integer package. The int api is:
+The second program is int.asm. This is a 16Bit integer package with some basic ASCIIZ string subroutines. For subroutine arguments (parameters) I use register A=low byte, X=high byte. Or you can place the parameters into "well known" zero page variables and call the subroutines. The 16Bit integer package is fast. I use the fastest multiplication and division subroutines from the net and I use my own fast integer to decimal conversation subroutine. The same int2dec idea I used in the 1980s for my Z80 32Bit integer package. The int api is:
 ```
 intsign = $9   ; 1 byte used by dec2int, intdiv, i32div
 intarg  = $A   ; 2 bytes 16bit argument
