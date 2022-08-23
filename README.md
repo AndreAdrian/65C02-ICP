@@ -105,3 +105,16 @@ I draw the 65C02-ICP schematics with KiCad. At the moment there is only a breadb
 - 74HC00 glue logic
 - 74HCT04, 74HC123, 3 x 74HC595 for in-circuit-programming
 - 2 x CP2102 modules for USB connection
+
+The in-circuit-programming part needs some hardware on the target computer - the 65C02 - and some software on the MS-Windows development computer. The EEPROM programmer software - named usb.exe - is in directory usb. There are the minimum files to recreate a Visual Studio project. Before you start Visual Studio, you have to get some files from Silabs, the CP2102 manufacturer. You need files SiUSBXp.h and SiUSBXp.lib in directoty usb/usb and file SiUSBXp.dll in directory usb/x64/Release. You find these files in the [USBXpress SDK v6.7.4 11/24/2021](https://www.silabs.com/developers/direct-access-drivers). You have to compile "Release" version, not "Debug" version, because the Silabs files need this. Again I use the machine code or object code format of virtual 6502 assembler. I copy the object code from virtual 6502 assembler to a hex file, e.g. mon7.hex for the monitor program. Then I call the EEPROM programmer program:
+```
+C:\src\usb\usb\x64\Release>usb mon7.hex
+CP2102 EEPROMer
+usage: usb [[filename] singlestep]
+USBX Devices found = 1
+USBX Device = 0 name = 0001
+prog time = 5360 ms
+```
+The programmer needs 5 seconds to program 320bytes. This is slow, but hey, what to you expect from my low-cost hardware solution? How does the programmer work? I use only two RS232 symbols. One symbol is all zeros, the other is all ones. The 74HC123 monoflop produces out of the RS232 start bit a rising edge at data bit 3 location. At that time the RS232 signal is either 0 or 1. I use this rising edge as SPI clock signal SCK and the RS232 TxD signal from the CP2102 USB-to-UART bridge as SPI MOSI signal to shift 24 bits into 3 74HC595 shift registers. After the bits are "loaded", the USB-to-UART bridge uses a /DTR pulse to operate the EEPROM /WE pin. Because real-time performance of MS-Windows is poor, this pulse is 3ms (milliseconds) long - even if the CPU is 4GHz fast. The 24 bits set address bus A0 to A15 and data bus D0 to D7. While the in-circuit-programming hardware is active, the CPU is not active and vice versa. A simple on-off switch does the trick.
+
+By the way, for EEPROM programming, the CP2102 has to work as USBXpress device. I use [CP210x Legacy Programming Utilities](https://community.silabs.com/s/article/cp210x-legacy-programming-utilities?language=en_US) program CP210xSetIDs to change the USB ProductID (PID) to 0xEA61. See [AN169 USBXpress Programmer's Guide](https://www.silabs.com/documents/public/application-notes/AN169.pdf) for details.
