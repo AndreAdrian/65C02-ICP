@@ -3,6 +3,7 @@
  * (C) 2022 Andre Adrian
  *
  * 2022-08-26: first version
+ * 2022-08-27: print radix conversion exponent fraction correction constants
  */
 
  /*
@@ -64,10 +65,21 @@ UFPP fpu2fpp(FPU f)
     return u;
 }
 
-// print IEEE754 format
+// print IEEE754 format 1
 void fpp_print(UFPP u)
 {
     printf("%11.8f = 0x%08X = %d %3d %6X\n", u.f, u.l, u.p.s, u.p.e, u.p.f);
+}
+
+// print IEEE754 format 2
+void fpp2_print(UFPP u)
+{
+    int ex = (signed)u.p.e - expbias;
+    double fr = (double)(u.p.f | leadbit) / 8388608.0;
+    int ex2 = (signed)u.p.e - expbias + 1;
+    double fr2 = (double)(u.p.f | leadbit) / 16777216.0;
+    printf("%13.6e = %d %3d %6X = %9.7f %4d = %9.7f %4d\n", u.f, u.p.s, u.p.e, u.p.f, 
+        fr, ex, fr2, ex2);
 }
 
 // print internal fp format
@@ -164,5 +176,17 @@ int main()
         printf("%-11s = %d %4d %6X = %11s = %11.8f\n",
             fractions[i], f.s, f.e, f.f, buf, u.f);
     }
+
+    printf("\n    IEEE754   = s exp fract. = fraction  2^   = fraction  2^\n");
+    u.f = 1.0e-12f; fpp2_print(u);
+    u.f = 1.0e-9f; fpp2_print(u);
+    u.f = 1.0e-6f; fpp2_print(u);
+    u.f = 1.0e-3f; fpp2_print(u);
+    u.f = 1.0f; fpp2_print(u);
+    u.f = 1.0e3f; fpp2_print(u);
+    u.f = 1.0e6f; fpp2_print(u);
+    u.f = 1.0e9f; fpp2_print(u);
+    u.f = 1.0e12f; fpp2_print(u);
+
     return 0;
 }
