@@ -27,7 +27,7 @@ The number 1.0 is a good example to explain details of the IEEE754 32bit format.
 
 There are "best practices" for an integer package, which I used in int.asm. With a fp package you have more alternatives. Let's start with radix conversion, that is the conversion between human readable ASCII string in decimal (Radix 10) system to and from computer internal binary (Radix 2) system. Donald Knuth writes in "The Art of Computer programming, Volume 2 Seminumerical Algorithms, chapter 4.4 Radix conversion" about "The four basic methods" for radix conversion. The subchapter "Converting fractions" tells us "No equally fast method of converting fractions manually is known. The best way seems to be Method 2a \[Multiplication by B using radix-b arithmetric\]". The subchapter "Floating point conversion" tells the complete story of radix conversion: "it is necessary to deal with both the exponent and the fraction parts simultaneously, since conversion of the exponent will affect the fraction part".
 
-The fraction program can only convert fp numbers between -1 and -0.1 and +0.1 to 1 from decimal to fp and vice versa. That is, I avoid the "correction multiplications". Example: The exponent 2^10 is 1.024 * 10^3. The 1.024 is the constant for the correction multiplication from binary to decimal.
+The fraction program can only convert fp numbers between -1 and -0.1 and +0.1 to 1 from decimal to fp and vice versa. That is, I avoid the "correction multiplications". Example: The exponent 2^10 is 1.024 * 10^3. The exponent 10^3 is 0.9765625 * 2^10. The fraction "correction" constants are 0.9765625 to convert from decimal to binary and 1.024 to convert from binary to decimal.
 
 The following table shows the quality of my decimal-to-fp function dcm2fpu() and fp-to-decimal function fpu2dcm(). The "to string" column shows the result of a decimal to fp to decimal again conversion. The "IEEE754" column uses the conversion that is part of printf() as reference. The columns s, exp, fraction show the internal fp format with 2ers complement exponent and explicit leading bit fraction.
 ```
@@ -63,4 +63,18 @@ from string = s exp fraction = to string  =  IEEE754
 -0.99999995 = 1   -1 FFFFFF = -0.99999996 = -0.99999994
 ```
 You find the fraction.cpp source code in folder fraction, ready to compile with Microsoft Visual Studio. But the source code should compile and run on Linux (very good OS) and MacOS (just another UNIX), too.
+
+The following table looks into the "correction" constants. I use the engineering scaling of exponents, that is steps of 3, like 10^-12, 10^-9, 10^-3, 10^0, 10^3, 10^6, 10^9, 10^12. The first column shows the IEEE754 number as converted by printf(). The second column shows the IEEE754 parts sign, biased exponent and fraction with implicit leading bit. The third column shows the fraction as decimal fraction and the "true" exponent for base (radix) 2 in the normal IEEE754 notation with 1.0 <= fraction < 2.0. The last column shows the fraction with 0.5 <= fraction < 1.0. I use this interpretation of IEEE754, because it makes floating point conversion from ASCII to binary easier.
+```
+    IEEE754   = s exp fract. = fraction  2^   = fraction  2^
+ 1.000000e-12 = 0  87  CBCCC = 1.0995116  -40 = 0.5497558  -39
+ 1.000000e-09 = 0  97  9705F = 1.0737418  -30 = 0.5368709  -29
+ 1.000000e-06 = 0 107  637BD = 1.0485760  -20 = 0.5242880  -19
+ 1.000000e-03 = 0 117  3126F = 1.0240000  -10 = 0.5120000   -9
+ 1.000000e+00 = 0 127      0 = 1.0000000    0 = 0.5000000    1
+ 1.000000e+03 = 0 136 7A0000 = 1.9531250    9 = 0.9765625   10
+ 1.000000e+06 = 0 146 742400 = 1.9073486   19 = 0.9536743   20
+ 1.000000e+09 = 0 156 6E6B28 = 1.8626451   29 = 0.9313226   30
+ 1.000000e+12 = 0 166 68D4A5 = 1.8189894   39 = 0.9094947   40
+```
 To be continued ...
