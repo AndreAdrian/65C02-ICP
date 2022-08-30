@@ -1,22 +1,10 @@
 /* fraction.cpp
- * IEEE754 compatible fraction prototype for 65C02
+ * IEEE754 compatible floating point for 65C02
+ * See https://github.com/AndreAdrian/65C02-ICP/blob/main/floating-point.md
  * (C) 2022 Andre Adrian
  *
  * 2022-08-26: first version
- * 2022-08-27: print radix conversion exponent fraction correction constants
- * 2022-08-27: do some exponent fraction correction for dcm2fpu
- * 2022-08-28: refactoring
- */
-
- /*
-The IEEE754 single (32bit) format fraction f is normalized to 1 <= f < 2 for biased
-exponent = 127. It is an unsigned q 1.23 number (one bit left to the binary point and
-23 bits right). The leading bit is, for normalized numbers, always 1 and is implicit.
-
-Another fraction interpretation is 0.5 <= f < 1 for biased exponent = 126. and
-leading bit is 1. I use this interpretation to convert between decimal (ASCII format)
-to IEEE754 32bit for the range -1.0 < f <= -0.1 and  0.1 <= f < 1.0.
-For these two ranges my routines are compatible to IEEE754.
+ * 2022-08-30: dcm2fpu() for 10^-5 to 10^5, fpu2dcm() for 2^-7 to 2^7
  */
 
 #include <cstdio>
@@ -24,7 +12,8 @@ For these two ranges my routines are compatible to IEEE754.
 enum {
     leadbit = 0x800000,     // implicit/explicit leading bit
     expbias = 127,          // Exponent bias
-    round = 128,            // decimal fraction conversion rounding
+    roundbit = 5,
+    round = (1<<roundbit)-1,    // fraction radix conversion rounding
 };
 
 // IEEE754 Single (32bit) Format Floating Point
@@ -67,12 +56,13 @@ UFPP fpu2fpp(FPU f)
     return u;
 }
 
-unsigned long mul32(unsigned long a, unsigned long b)
+// unsigned Q4.28 multiplication
+unsigned long mul28(unsigned long a, unsigned long b)
 {
-    return ((unsigned long long)a * b) >> 32;
+    return ((unsigned long long)a * b) >> 28;
 }
 
-// converts int [-32768 .. 32767] from ASCII string
+// converts ASCII to int [-32768 .. 32767]
 short dcm2int(char* buf)
 {
     unsigned char s = 0;
@@ -90,90 +80,137 @@ short dcm2int(char* buf)
     return v;
 }
 
-// Constants for decimal to fraction conversion and vice versa range +/-[0.1 .. 1)
-// Constants are unsigned q 0.32, that is q(0.1) = 0.1 * 2^32
-unsigned long c[] = { 429496730, 42949673, 4294967, 429497, 42950, 4295, 429, 43 };
+// Q4.28 constants 1.0, 0.1, ... 0.000001 for fraction conversion
+unsigned long c1[] = { 268435456, 26843546, 2684355, 268435, 26844, 2684, 268 };
 
-// radix 10 exp to radix 2 exp fraction conversion constants
-// a=radix 10 exp, b=radix 2 exp, c=10^a * 2^(32 - b)
-// Constants are unsigned Q0.32, a=3, b=10, c=4194304000 (0.9765625)
-unsigned long c2[] = { 2417851639, 2361183241, 2305843009, 2251799814, 2199023256, 0,
-    4194304000, 4096000000, 4000000000,  3906250000,  3814697266 };    // 32bit
+// Q4.28 fraction constants to convert exponent 10^x to exponent 2^y
+unsigned long c2[] = { 351843721, 439804651, 274877907, 343597384, 429496730,
+    268435456, 335544320, 419430400, 524288000, 327680000,  409600000 };
 
-// radix 10 exp to radix 2 exp exp conversion constants
-// Constants are signed int
-signed char c3[] = { -49, -39, -29, -19, -9, 0, 10, 20, 30, 40, 50 };
+// integer exponent constants, radix 10 to radix 2, e.g. 10^-5 converts to 2^-17
+signed char c3[] = { -17, -14, -10, -7, -4, 0, 3, 6, 9, 13, 16 };
 
 int e10;    // use globals for easy print function internals
 int endx;
 
-// converts fp (-1 .. -0.1] and [0.1 .. 1) from ASCII string
+// convert ASCII string -?[1-9].[0-9]*(e-?[0-9]+)? to fp
+// RE: ?= 0 to 1 repetition, *=0 to N repetition, +=1 to N repetition
 FPU dcm2fpu(char* buf)
 {
     FPU f;
     f.s = 0;
-    f.e = -1;
-    f.f = round;
+    f.e = 0;
+    f.f = 0;
 
-    // do fraction part -?0.[0-9]+
-    // regular expression ?= 0 to 1 repetition, +=1 to N repetition
+    // do fraction part -?[1-9].[0-9]*
     if ('-' == *buf) {
         f.s = 1;
         ++buf;
     }
-    ++buf;  // read over 0
+    unsigned long digit = *buf++ - '0';
+    f.f = digit * c1[0];
     ++buf;  // read over .
-    for (int i = 0; i < sizeof c / sizeof c[0]; ++i) {
+    for (int i = 1; i < sizeof c1 / sizeof c1[0]; ++i) {
         if (*buf < '0' || *buf > '9') break;
-        unsigned long digit = *buf++ - '0';
-        f.f += digit * c[i];
+        digit = *buf++ - '0';
+        f.f += digit * c1[i];
     }
     // do exponent part e-?[0-9]+
     if ('e' == *buf++) {
         e10 = dcm2int(buf);
-        endx = (e10 + 15) / 3;
-        if (c3[endx] != 0) {
-            f.f = mul32(f.f, c2[endx]); // disadvantage: needs 32bit mul
-            f.e += c3[endx];
+        if (0 == f.f && 0 == e10) {     // zero 0.e0
+            f.e = -expbias;
+            return f;
         }
+        endx = e10 + 5;
+        f.f += round;
+        f.f = mul28(f.f, c2[endx]);
+        f.e = c3[endx];
     }
+
     // normalize
-    while (0 == (f.f & 0x80000000)) {
+    while (f.f & 0xE0000000) { // fraction to large
+        f.f >>= 1;
+        ++f.e;
+    }
+    while (0 == (f.f & 0xF0000000)) { // fraction to small
         f.f <<= 1;
         --f.e;
     }
-    f.f >>= 8;              // remove "precision" bits
+    f.f >>= roundbit;   // remove "rounding" bits
     return f;
 }
 
-// converts fp (-1 .. -0.1] and [0.1 .. 1) to ASCII string
+// converts int [-99..99] to ASCII string
+void exp2dcm(char* buf, signed char e)
+{
+    if (e < 0) {
+        *buf++ = '-';
+        e = 0 - e;
+    }
+    signed char tens = e / 10;
+    if (tens != 0) {
+        *buf++ = e / 10 + '0';
+    }
+    *buf++ = e % 10 + '0';
+    *buf = '\0';
+}
+
+// Q4.28 fraction constants to convert exponent 2^x to exponent 10^y
+unsigned long c4[] = {
+    209715200, 419430400, 838860800, 167772160, 335544320, 671088640, 1342177280,
+    268435456, 536870912, 1073741824, 214748365, 429496730, 268435456, 171798692, 343597384 };
+
+// integer exponent constants, radix 2 to radix 10, e.g. 2^-7 converts to 10^-2
+signed char c5[] = { -2, -2, -2, -1, -1, -1, -1, 0, 0, 0, 1, 1, 1, 2, 2 };
+
+// convert fraction to ASCII string
 void fpu2dcm(char* buf, FPU f)
 {
-    f.f <<= 8;              // add "precision" bits
-    f.f += round;
-    f.f >>= (-1 - f.e);     // de-normalize
     if (1 == f.s) *buf++ = '-';
-    *buf++ = '0';
+    if (-127 == f.e && 0 == f.f) {      // zero
+        *buf++ = '0';
+        *buf++ = '.';
+        *buf++ = 'e';
+        *buf++ = '0';
+        *buf = '\0';
+        return;
+    }
+    f.f <<= roundbit;       // add "rounding" bits
+    f.f += round;
+
+    endx = f.e + 7;
+    f.f = mul28(f.f, c4[endx]);
+
+    // do fraction part
+    char digit = '0';
+    while (f.f >= c1[0]) {
+        ++digit;
+        f.f -= c1[0];
+    }
+    *buf++ = digit;
     *buf++ = '.';
-    for (int i = 0; i < sizeof c / sizeof c[0]; ++i) {
+    for (int i = 1; i < sizeof c1 / sizeof c1[0]; ++i) {
         char digit = '0';
-        while (f.f >= c[i]) {
+        while (f.f >= c1[i]) {
             ++digit;
-            f.f -= c[i];
+            f.f -= c1[i];
         }
         *buf++ = digit;
     }
-    *buf = '\0';
+    // do exponent part
+    *buf++ = 'e';
+    exp2dcm(buf, c5[endx]);
 }
 
 // test cases
 int main()
 {
     float floattst1[] = {
-        0.0f, -0.0f, 0.1f, 0.125f, 0.25f, 0.5f, 0.75f, 0.99999995f, 1.0f, -1.0f,
-        1.5f, 1.9999999f, 2.0f, 4.0f, 8.0f
+        0.0f, -0.0f, 0.125f, 0.25f, 0.5f, 1.0f, -1.0f,
+        1.5f, 1.9999999f, 2.0f, 4.0f, 8.0f, 9.999999f
     };
-    printf("  IEEE754  =  hexfloat  = s exp hexfrac. = fraction  2^\n");
+    printf("  IEEE754  =  hexfloat  = s exp implicit = fraction  2^\n");
     for (int i = 0; i < sizeof floattst1 / sizeof floattst1[0]; ++i) {
         UFPP u;
         u.f = floattst1[i];
@@ -184,53 +221,71 @@ int main()
     }
 
     char dcmtst1[][12] = {
-        "0.1", "0.11", "0.101", "0.1001", "0.10001", "0.100001", "0.1000001", "0.10000001",
-        "0.5", "0.55", "0.505", "0.5005", "0.50005", "0.500005", "0.5000005", "0.50000005",
-        "0.9", "0.99", "0.909", "0.9009", "0.90009", "0.900009", "0.9000009", "0.90000009",
-        "0.99999995",
-        "-0.10000001", "-0.50000005", "-0.90000009", "-0.99999995"
+        "1.", "1.1", "1.01", "1.001", "1.0001", "1.00001", "1.000001",
+        "5.", "5.5", "5.05", "5.005", "5.0005", "5.00005", "5.000005",
+        "9.", "9.9", "9.09", "9.009", "9.0009", "9.00009", "9.000009",
+        "9.999999",
+        "-1.000001", "-5.000005", "-9.000009", "-9.999999",
+        "0.e0", "-0.e0"
     };
-    printf("\nfrom string = s  2^  hexfrac.  = to string  =   IEEE754\n");
+    printf("\nfrom ASCII= s explicit fraction 2^   =   to ASCII  =  IEEE754\n");
     for (int i = 0; i < sizeof dcmtst1 / sizeof dcmtst1[0]; ++i) {
         FPU f = dcm2fpu(dcmtst1[i]);
+        double fr = (double)f.f / 8388608.0;
         char buf[16];
         fpu2dcm(buf, f);
         UFPP u = fpu2fpp(f);
-        printf("%-11s = %d %4d 0x%06X = %11s = %11.8f\n",
-            dcmtst1[i], f.s, f.e, f.f, buf, u.f);
+        printf("%-9s = %d 0x%06X %1.6f %4d = %11s = %9.6f\n",
+            dcmtst1[i], f.s, f.f, fr, f.e, buf, u.f);
     }
 
     float floattst2[] = {
-        0.1e-15f, 0.1e-12f, 0.1e-9f, 0.1e-6f, 0.1e-3f, 0.1f,
-        0.1e3f, 0.1e6f, 0.1e9f, 0.1e12f, 0.1e15f
+        1.e-5f, 1.e-4f, 1.e-3f, 1.e-2f, 1.e-1f, 
+        1.e0f, 1.e1f, 1.e2f, 1.e3f, 1.e4f, 1.e5f
     };
-    printf("\n   IEEE754    = s exp hexfrac. = fraction  2^   = fraction  2^\n");
+    printf("\n   IEEE754    = s exp implicit = fraction  2^\n");
     for (int i = 0; i < sizeof floattst2 / sizeof floattst2[0]; ++i) {
         UFPP u;
         u.f = floattst2[i];
         int ex = (signed)u.p.e - expbias;
         double fr = (double)(u.p.f | leadbit) / 8388608.0;
-        int ex2 = (signed)u.p.e - expbias + 1;
-        double fr2 = (double)(u.p.f | leadbit) / 16777216.0;
-        printf("%13.6e = %d %3d 0x%06X = %9.7f %4d = %9.7f %4d\n",
-            u.f, u.p.s, u.p.e, u.p.f, fr, ex, fr2, ex2);
+        printf("%13.6e = %d %3d 0x%06X = %8.6f %4d\n",
+            u.f, u.p.s, u.p.e, u.p.f, fr, ex);
     }
 
     char dcmtst2[][14] = {
-         "0.1e-15",  "0.1e-12", "0.1e-9", "0.1e-6", "0.1e-3",
-         "0.1e0", "0.1e3", "0.1e6", "0.1e9", "0.1e12", "0.1e15",
-         "0.55e0", "0.505e3", "0.5005e6", "0.50005e9", "0.500005e12", "0.5000005e15"
+         "1.e-5",  "1.e-4", "1.e-3", "1.e-2", "1.e-1",
+         "1.e0", "8.e0", "0.8e1", "1.e1", "1.e2", "1.e3", "1.e4", "1.e5",
+         "5.e-3", "5.5e-2", "5.05e-1", "5.005e0", "5.0005e1", "5.00005e2", "5.000005e3"
     };
-    printf("\n from string  = 10^ ndx= hexfrac. fraction 2^ =   IEEE754\n");
+    printf("\n from ASCII = 10^ ndx= explicit fraction 2^   =   IEEE754\n");
     for (int i = 0; i < sizeof dcmtst2 / sizeof dcmtst2[0]; ++i) {
         FPU f = dcm2fpu(dcmtst2[i]);
         UFPP u = fpu2fpp(f);
-        double fr2 = (double)f.f / 16777216.0;
+        double fr = (double)f.f / 8388608.0;
         float f1;
         sscanf_s(dcmtst2[i], "%f", &f1);
-        printf("%-13s = %3d %2d = 0x%06X %f %3d = %12.6e\n",
-            dcmtst2[i], e10, endx, f.f, fr2, f.e, u.f);
+        printf("%-11s = %3d %2d = 0x%06X %f %4d = %12.6e\n",
+            dcmtst2[i], e10, endx, f.f, fr, f.e, u.f);
     }
 
+    float floattst3[] = {
+        0.78125e-2f, 1.5625e-2f, 3.125e-2f, 0.625e-1f, 1.25e-1f, 2.5e-1f, 5.e-1f,
+        1.e0f, 2.e0f, 4.e0f, 8.e0f, 1.6e1f, 3.2e1f, 6.4e1f, 1.28e2f
+    };
+    printf("\n   IEEE754    = fraction 2^   =  to ASCII\n");
+    for (int i = 0; i < sizeof floattst3 / sizeof floattst3[0]; ++i) {
+        UFPP u;
+        u.f = floattst3[i];
+        FPU f;
+        f.s = u.p.s;
+        f.e = (signed)u.p.e - expbias;
+        f.f = u.p.f | leadbit;
+        double fr = (double)f.f / 8388608.0;
+        char buf[16];
+        fpu2dcm(buf, f);
+        printf("%13.6e = %1.6f %4d = %-12s\n", 
+            u.f, fr, f.e, buf);
+    }
     return 0;
 }
