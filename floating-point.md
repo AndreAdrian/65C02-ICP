@@ -132,7 +132,7 @@ The next table shows radix 2 to radix 10 conversion. The radix 2 exponent 2^3 ca
  1.000000e+32 = 1.2325952  106 = 1.000000e32
  9.999999e+32 = 1.5407438  109 = 9.999999e32
 ```
-Another tricky detail is the "pseudo radix 16" constants array c4. There are only entries for 2^(4\*x), like 2^-3, 2^0, 2^4. The Q4.28 conversion variable allows the necessary shift of the Q1.23 fraction the match the floating point radix 2 exponent to the available entries in the constants array. Note: The IBM 360 had radix 16 exponents. This solution resulted in up to 3Bits loss of fraction precision. My pseudo radix 16 solution has not this disadvantage!
+Another tricky detail is the "pseudo radix 16" constants array c4. There are only entries for exponents 2^(4\*x), like 2^-3, 2^0, 2^4. The Q4.28 conversion variable allows the necessary shift of the Q1.23 fraction to match the floating point radix 2 exponent to the available entries in the constants array. Note: The IBM 360 had radix 16 exponents. This solution resulted in up to 3Bits loss of fraction precision. My pseudo radix 16 solution has not this disadvantage!
 
 The purpose of the constants arrays c1 to c5 are:
 ```
@@ -142,7 +142,7 @@ c3: integer exponent constants, radix 10 to radix 2, e.g. 10^0 converts to 2^0 .
 c4: Q fraction constants to convert exponent 2^x to exponent 10^y
 c5: integer exponent constants, radix 2 to radix 10, e.g. 2^3 converts to 10^0 .. 10^1
 ```
-In the last table (for now) you can see that a given radix 2 exponent can have two different radix 10 exponents. A given radix 10 exponent can even have up tp four different radix 2 exponents. The logarithm to base 2 of 10 is 3.3219.. You need more then 3 radix 2 bits to express one radix 10 digit.
+In the last table (for now) you can see that a given radix 2 exponent can have two different radix 10 exponents. A given radix 10 exponent can have up to four different radix 2 exponents. The logarithm to base 2 of 10 is 3.3219.. You need more then 3 radix 2 bits to express one radix 10 digit.
 ```
    IEEE754    = fraction  2^   =   to ASCII
  3.125000e-02 = 1.0000000   -5 = 3.125000e-2
@@ -167,3 +167,5 @@ In the last table (for now) you can see that a given radix 2 exponent can have t
  3.200000e+01 = 1.9999999    4 = 3.199999e1
 ```
 My fp package does not implement the full exponent range from 10^-38 to 10^38, neither IEEE754 NaN (not a number), infinite and denormalized numbers (numbers between 0 and 2^-126). As Donald Knuth told us, radix conversion is tricky. I seldom need "The Art of computer programming" for my daily work. The actual fp calculations need care, too. But this is another story.
+
+Right now, there is only a C++ implementation of the radix conversion algorithms. As always it is good to make the work on the highest possible level of abstraction. I wrote "6502" compatible C++. I use subroutines for 32Bits addition, subtraction and multiplication. I replaced necessary divisions by repeated subtractions. Transcribing the C++ source code into 6502 assembler should be easy.
