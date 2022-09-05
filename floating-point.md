@@ -142,29 +142,29 @@ c3: integer exponent constants, radix 10 to radix 2, e.g. 10^0 converts to 2^0 .
 c4: Q fraction constants to convert exponent 2^x to exponent 10^y
 c5: integer exponent constants, radix 2 to radix 10, e.g. 2^3 converts to 10^0 .. 10^1
 ```
-In the last table (for now) you can see that a given radix 2 exponent can have two different radix 10 exponents. A given radix 10 exponent can have up to four different radix 2 exponents. The logarithm to base 2 of 10 is 3.3219.. You need more then 3 radix 2 bits to express one radix 10 digit.
+In the last table (for now) you can see that a given radix 2 exponent can have two different radix 10 exponents. A given radix 10 exponent can have up to four different radix 2 exponents. Furthermore you see the "Matula condition" in action. We need 8 decimal digits to convert an IEEE754 single format number to ASCII and back to IEEE754 without loss. See CACM, January 1968, David W. Matula, In-and-Out Conversions. The IEEE754 fraction precision is only 6,9236.. decimal digits.
 ```
-   IEEE754    = fraction  2^   =   to ASCII
- 3.125000e-02 = 1.0000000   -5 = 3.125000e-2
- 6.250000e-02 = 1.9999999   -5 = 6.249999e-2
- 6.250000e-02 = 1.0000000   -4 = 6.250000e-2
- 1.250000e-01 = 1.9999999   -4 = 1.249999e-1
- 1.250000e-01 = 1.0000000   -3 = 1.250000e-1
- 2.500000e-01 = 1.9999999   -3 = 2.499999e-1
- 2.500000e-01 = 1.0000000   -2 = 2.500000e-1
- 5.000000e-01 = 1.9999999   -2 = 4.999999e-1
- 5.000000e-01 = 1.0000000   -1 = 5.000000e-1
- 9.999999e-01 = 1.9999999   -1 = 9.999999e-1
- 1.000000e+00 = 1.0000000    0 = 1.000000
- 2.000000e+00 = 1.9999999    0 = 1.999999
- 2.000000e+00 = 1.0000000    1 = 2.000000
- 4.000000e+00 = 1.9999999    1 = 3.999999
- 4.000000e+00 = 1.0000000    2 = 4.000000
- 8.000000e+00 = 1.9999999    2 = 7.999999
- 8.000000e+00 = 1.0000000    3 = 8.000000
- 1.600000e+01 = 1.9999999    3 = 1.599999e1
- 1.600000e+01 = 1.0000000    4 = 1.600000e1
- 3.200000e+01 = 1.9999999    4 = 3.199999e1
+ IEEE754   = fraction  2^   =   to ASCII   =  IEEE754
+0x3D000000 = 1.0000000   -5 = 3.1250000e-2 = 0x3D000000
+0x3D7FFFFF = 1.9999999   -5 = 6.2499996e-2 = 0x3D7FFFFF
+0x3D800000 = 1.0000000   -4 = 6.2500003e-2 = 0x3D800000
+0x3DFFFFFF = 1.9999999   -4 = 1.2499999e-1 = 0x3DFFFFFF
+0x3E000000 = 1.0000000   -3 = 1.2500000e-1 = 0x3E000000
+0x3E7FFFFF = 1.9999999   -3 = 2.4999998e-1 = 0x3E7FFFFF
+0x3E800000 = 1.0000000   -2 = 2.5000000e-1 = 0x3E800000
+0x3EFFFFFF = 1.9999999   -2 = 4.9999997e-1 = 0x3EFFFFFF
+0x3F000000 = 1.0000000   -1 = 5.0000000e-1 = 0x3F000000
+0x3F7FFFFF = 1.9999999   -1 = 9.9999994e-1 = 0x3F7FFFFF
+0x3F800000 = 1.0000000    0 = 1.0000000    = 0x3F800000
+0x3FFFFFFF = 1.9999999    0 = 1.9999999    = 0x3FFFFFFF
+0x40000000 = 1.0000000    1 = 2.0000000    = 0x40000000
+0x407FFFFF = 1.9999999    1 = 3.9999998    = 0x407FFFFF
+0x40800000 = 1.0000000    2 = 4.0000000    = 0x40800000
+0x40FFFFFF = 1.9999999    2 = 7.9999995    = 0x40FFFFFF
+0x41000000 = 1.0000000    3 = 8.0000000    = 0x41000000
+0x417FFFFF = 1.9999999    3 = 1.5999999e1  = 0x417FFFFF
+0x41800000 = 1.0000000    4 = 1.6000000e1  = 0x41800000
+0x41FFFFFF = 1.9999999    4 = 3.1999999e1  = 0x41FFFFFF
 ```
 My fp package does not implement the full exponent range from 10^-38 to 10^38, neither IEEE754 NaN (not a number), infinite and denormalized numbers (numbers between 0 and 2^-126). As Donald Knuth told us, radix conversion is tricky. I seldom need "The Art of computer programming" for my daily work. The actual fp calculations need care, too. But this is another story.
 
