@@ -3,6 +3,7 @@
  * 
  * 2022-09-02: use "pseudo radix 16" for c4, c5
  * 2022-09-03: emit hexadecimal numbers
+ * 2022-09-05: use 8 decimal digits
  */
 
 #include <cstdio>
@@ -15,11 +16,11 @@
 // It can store values from 0.0 to 15.99999999.
 
 enum {
+	Digits = 8,	    // proper fraction digits
 	Ibits = 4,		// integer bits 0 .. 15
 	Emin10 = -31,	// Radix 10 minimal exponent
 	Emin2 = -108,	// Radix 2 minimal exponent
 
-	Digits = 9,
 	Fbits = 32 - Ibits,		// Fraction bits 0.0 .. 0.99999999
 	Fvalue = 1 << Fbits,	// Fraction value
 	Emax10 = 1 - Emin10,	// Radix 10 maximum exponent
@@ -34,7 +35,7 @@ const double Rvalue = 0.5;				// rounding value
 void c1()
 {
 	double fc1 = Firstdigit;	// float c1
-	for (int i = 0; i < Digits; ++i, fc1 = fc1 / 10.0) {
+	for (int i = 0; i < Digits+2; ++i, fc1 = fc1 / 10.0) {
 		double sc1 = fc1 * Fvalue;	// scaled c1
 		unsigned long c1 = (unsigned long)(sc1 + Rvalue);
 		// printf("%10.7f %12.1f %12d\n", fc1, sc1, c1);
@@ -136,6 +137,7 @@ void c4c5(char mode)
 int main()
 {
 	printf("enum {\n");
+	printf("Digits = %d,\n", Digits);
 	printf("Ibits = %d,\n", Ibits);
 	printf("Emin10 = %d,\n", Emin10);
 	printf("Emin2 = %d,\n", Emin2);
@@ -164,4 +166,3 @@ int main()
 	printf("\n\nc2 min/max = %f %f\n", c2min, c2max);
 	printf("c4 min/max = %f %f\n", c4min, c4max);
 }
-
