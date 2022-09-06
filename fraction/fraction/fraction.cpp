@@ -4,9 +4,11 @@
  * (C) 2022 Andre Adrian
  *
  * 2022-08-26: first version
+ * 2022-08-30: dcm2fpu() for 10^-5 to 10^5, fpu2dcm() for 2^-7 to 2^7
  * 2022-08-31: use program fpconsts to create c1 to c5
  * 2022-09-02: allow Ibits in range 4 to 5, firstdigit=10.0, pseudo radix 16 exponent
  * 2022-09-03: fpu2dcm() output always X.XXXXXX
+ * 2022-09-05: use 8 decimal digits because of Matula condition
  */
 
 #include <cstdio>
@@ -32,14 +34,14 @@
 
  // Program fpconsts creates the following values:
 enum {
+    Digits = 8,
     Ibits = 4,
     Emin10 = -31,
     Emin2 = -108,
 };
 
 unsigned long c1[] = {
-0xA0000000, 0x10000000, 0x199999A, 0x28F5C3, 0x41893, 0x68DC, 
-0xA7C, 0x10C, 0x1B,
+0xA0000000, 0x10000000, 0x199999A, 0x28F5C3, 0x41893, 0x68DC, 0xA7C, 0x10C, 0x1B, 0x3,
 };
 
 unsigned long c2[] = {
@@ -297,7 +299,7 @@ void fpu2dcm(char* buf, FPU f)
     // without flag output can be 00.XXXXXXX, 0X.XXXXXX or XX.XXXXX
     // pseudo mul10, div10 by suppress leading zeros and correct radix 10 exponent
     uint8_t flag = 0;
-    uint8_t digits = 8;  // 8 will print 7 digits because "real" output is 0X.XXXXXX
+    uint8_t digits = Digits+1;  // 8 will print 7 digits because "real" output is 0X.XXXXXX
     int8_t exp10 = c5[endx];
     for (int8_t i = 0; i < digits; ++i) {
         int8_t digit = '0';
@@ -424,7 +426,7 @@ int main()
         0x40000000, 0x407FFFFF, 0x40800000, 0x40FFFFFF, 
         0x41000000, 0x417FFFFF, 0x41800000, 0x41FFFFFF,
     };
-    printf("\n   IEEE754    = fraction  2^   =   to ASCII\n");
+    printf("\n IEEE754   = fraction  2^   =   to ASCII   =  IEEE754\n");
     for (int i = 0; i < sizeof floattst4 / sizeof floattst4[0]; ++i) {
         UFPP u;
         u.l = floattst4[i];
@@ -434,9 +436,15 @@ int main()
         f.f = u.p.f | Leadbit;
         double fr = (double)f.f / 8388608.0;
         char buf[16];
-        fpu2dcm(buf, f);
-        printf("%13.6e = %9.7f %4d = %-12s\n",
-            u.f, fr, f.e, buf);
+        fpu2dcm(buf, f);        // to ASCII
+        FPU f2 = dcm2fpu(buf);
+        UFPP u2 = fpu2fpp(f2);
+        printf("0x%06X = %9.7f %4d = %-12s = 0x%06X\n",
+            u.l, fr, f.e, buf, u2.l);
     }
+
+    long double s, t = 3.0;
+    s = 1.0 - (4.0 / t - 1.0) * t;
+    printf("%e sizeof %d\n", s, sizeof s);
     return 0;
 }
