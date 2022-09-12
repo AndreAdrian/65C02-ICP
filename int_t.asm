@@ -6,6 +6,7 @@
 
 ; 2022-08-22 first version
 ; 2022-08-23 no gap between mon zp and int zp variables
+; 2022-09-12 faster mul
 
 ; import mon7 9600bps/38400bps, RTS/CTS, 256bytes rx buf
   monbyte = $0    ; 1 byte used by getbyte/putbyte
@@ -44,9 +45,9 @@
   ; unsigned 16bit to unsigned decimal ASCII
   uns2deca= $FD42 ; in: intacc, out: x=high, a=low ASCIIZ pointer len<256
   uns2dec = $FD46 ; in: intacc out: strptr ASCIIZ pointer len<256
-  intmula = $FDEB ; in: x=high, a=low value, intarg, out: 32bit (intacc, resulth)
+  intmula = $FDEB ; in: x=high, a=low value, intarg, out: 16bit (intacc)
   unsmula = $FDEB ; in: x=high, a=low value, intarg, out: 32bit (intacc, resulth)
-  intmul  = $FDEF ; in: intacc, intarg out: 32bit (intacc, resulth)
+  intmul  = $FDEF ; in: intacc, intarg out: 16bit (intacc)
   unsmul  = $FDEF ; in: intacc, intarg out: 32bit (intacc, resulth)
   intdiva = $FE49 ; in: x=high, a=low value, intarg, out: intacc=acc/arg, remaindr=acc%arg
   intdiv  = $FE4D ; in: intacc, intarg, out: intacc=acc/arg, remaindr=acc%arg
