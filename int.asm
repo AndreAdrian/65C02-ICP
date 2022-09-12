@@ -14,6 +14,7 @@
 ; 2022-08-18 add dec2int
 ; 2022-08-19 add gets
 ; 2022-08-23 no gap between mon zp and int zp variables
+; 2022-09-12 faster mul
 
 ; import mon7 9600bps/38400bps, RTS/CTS, 256bytes rx buf
   monbyte = $0    ; 1 byte used by getbyte/putbyte
@@ -306,26 +307,51 @@ unsmul:
 ; 1986-01, Bob Sander-Cederlof, Fast 6502 & 65802 Multiply Routines
 ; http://www.txbobsc.com/aal/1986/aal8601.html#a5
 
-  lda #0
+;   lda #0
+;   sta resulth
+;   sta resulth+1
+;   ldx #16
+; : lda plier     ; check next bit of multiplier
+;   lsr
+;   bcc :+        ; ...don't add multiplicand
+;   clc           ; 16bit add
+;   lda resulth
+;   adc plicand
+;   sta resulth
+;   lda resulth+1
+;   adc plicand+1
+;   sta resulth+1
+; : ror resulth+1 ; 32bit shift right
+;   ror resulth
+;   ror result+1
+;   ror result
+;   dex
+;   bne :--
+;   rts
+  
+; http://forum.6502.org/viewtopic.php?t=689
+; adapted dclxvi solution
+
+  lda #0             ; resulth = 0
   sta resulth
-  sta resulth+1
   ldx #16
-: lda plier     ; check next bit of multiplier
-  lsr
-  bcc :+        ; ...don't add multiplicand
-  clc           ; 16bit add
-  lda resulth
+  lsr plier+1
+  ror plier
+: bcc :+
+  clc
+  sta resulth+1
+  lda plier+2
   adc plicand
   sta resulth
-  lda resulth+1
+  lda plier+3
   adc plicand+1
-  sta resulth+1
-: ror resulth+1 ; 32bit shift right
+: ror                ; A is resulth+1
   ror resulth
-  ror result+1
-  ror result
+  ror plier+1
+  ror plier
   dex
   bne :--
+  sta resulth+1
   rts
 
 intargng:
