@@ -301,58 +301,35 @@ unsmula:
 
 intmul:
 unsmul:
-; signed/unsigned integer multiply 16bit*16bit=32bit
+; signed integer multiply 16bit*16bit=16bit
+; unsigned integer multiply 16bit*16bit=32bit
 ; in: intacc, intarg out: 32bit (intacc, resulth)
 
-; 1986-01, Bob Sander-Cederlof, Fast 6502 & 65802 Multiply Routines
-; http://www.txbobsc.com/aal/1986/aal8601.html#a5
-
-;   lda #0
-;   sta resulth
-;   sta resulth+1
-;   ldx #16
-; : lda plier     ; check next bit of multiplier
-;   lsr
-;   bcc :+        ; ...don't add multiplicand
-;   clc           ; 16bit add
-;   lda resulth
-;   adc plicand
-;   sta resulth
-;   lda resulth+1
-;   adc plicand+1
-;   sta resulth+1
-; : ror resulth+1 ; 32bit shift right
-;   ror resulth
-;   ror result+1
-;   ror result
-;   dex
-;   bne :--
-;   rts
-  
 ; http://forum.6502.org/viewtopic.php?t=689
-; adapted dclxvi solution
+; modified dclxvi solution
 
-  lda #0             ; resulth = 0
+  lda #0          ; resulth+1 is in A
   sta resulth
   ldx #16
   lsr plier+1
-  ror plier
-: bcc :+
-  clc
-  sta resulth+1
-  lda plier+2
+  ror plier       ; plier lsb to carry
+: bcc :+          ; no carry, no add multiplicand
+  tay             ; resulth+1 is in Y
+  clc             ; 16bit add
+  lda resulth
   adc plicand
   sta resulth
-  lda plier+3
+  tya             ; resulth+1 is in A
   adc plicand+1
-: ror                ; A is resulth+1
+: ror             ; 32bit shift right
   ror resulth
-  ror plier+1
-  ror plier
+  ror result+1
+  ror result      ; plier lsb to carry
   dex
   bne :--
   sta resulth+1
   rts
+  .byte 0,0       ; faster mul is shorter, too
 
 intargng:
 ; intarg = -intarg = 0 - intarg
